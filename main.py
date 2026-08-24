@@ -17,20 +17,9 @@ def log(msg):
 def ping_sandbox():
     try:
         r = requests.get(SANDBOX_URL, timeout=5)
-        log(f'🏓 Sandbox: OK')
-    except:
-        log('⚠️ Sandbox offline')
-
-def get_last_id():
-    try:
-        with open('.last_msg_id', 'r') as f:
-            return f.read().strip()
-    except:
-        return None
-
-def save_last_id(msg_id):
-    with open('.last_msg_id', 'w') as f:
-        f.write(str(msg_id))
+        log(f'🏓 Sandbox pingado: {r.status_code}')
+    except Exception as e:
+        log(f'⚠️ Sandbox: {e}')
 
 def call_gemini(prompt):
     """Chama Gemini AI"""
@@ -38,66 +27,60 @@ def call_gemini(prompt):
     data = {
         "contents": [{"parts": [{"text": prompt}]}]
     }
+    log(f'🔮 Chamando Gemini...')
     try:
-        r = requests.post(url, json=data, timeout=10)
+        r = requests.post(url, json=data, timeout=30)
+        log(f'Gemini response: {r.status_code}')
         if r.status_code == 200:
             return r.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            log(f'Gemini erro: {r.text[:200]}')
     except Exception as e:
-        log(f'Gemini erro: {e}')
+        log(f'Gemini exception: {e}')
     return None
 
 def send_message(content):
     """Envia mensagem no Discord"""
-    headers = {'Authorization': f'Bot {DISCORD_TOKEN}', 'Content-Type': 'application/json'}
+    headers_discord = {'Authorization': f'Bot {DISCORD_TOKEN}', 'Content-Type': 'application/json'}
     payload = {'content': content}
     r = requests.post(f'https://discord.com/api/v10/channels/{CHANNEL_ID}/messages', 
-                      headers=headers, json=payload, timeout=10)
+                      headers=headers_discord, json=payload, timeout=10)
+    log(f'Enviou msg: {r.status_code}')
     return r.status_code == 200
 
 def fetch_messages():
-    headers = {'Authorization': f'Bot {DISCORD_TOKEN}'}
-    r = requests.get(f'https://discord.com/api/v10/channels/{CHANNEL_ID}/messages?limit=10', 
-                     headers=headers, timeout=10)
-    return r.json() if r.status_code == 200 else []
+    headers_discord = {'Authorization': f'Bot {DISCORD_TOKEN}'}
+    r = requests.get(f'https://discord.com/api/v10/channels/{CHANNEL_ID}/messages?limit=5', 
+                     headers=headers_discord, timeout=10)
+    if r.status_code == 200:
+        return r.json()
+    log(f'Erro fetch: {r.status_code}')
+    return []
 
 def main():
     log('🚀 Arena + Gemini Bot Started!')
     
-    # Ping no sandbox
     ping_sandbox()
     
-    last = get_last_id()
     msgs = fetch_messages()
     
-    for msg in reversed(msgs):
-        if msg['author'].get('bot') and msg['author']['username'] != 'Bod':
-            continue
-        if not msg.get('content'):
-            continue
-        if last and int(msg['id']) <= int(last):
-            continue
-        
+    for msg in msgs:
         author = msg['author']['username']
-        content = msg['content']
+        content = msg.get('content', '')
         
-        # Pula mensagens do próprio bot
-        if author == 'Bod':
-            # Verifica se mencionou o bot
-            if '@Bod' in content or 'arena' in content.lower():
-                log(f'📩 {author} me chamou: {content[:50]}')
-                
-                # Gera resposta com Gemini
-                prompt = f"Você é uma IA conversando no Discord. Responda de forma natural e amigável em português. Mensagem recebida: {content}"
-                resposta = call_gemini(prompt)
-                
-                if resposta:
-                    send_message(f'💭 {resposta[:1900]}')
-                    log(f'✅ Respondi via Gemini')
-        else:
+        # Responde a TODAS as mensagens de humanos (exceto bots)
+        if not msg['author'].get('bot', False) and content:
             log(f'📩 {author}: {content[:50]}')
-        
-        save_last_id(msg['id'])
-
+            
+            # Chama Gemini
+            resposta = call_gemini(f"Você é uma IA conversando no Discord. Responda de forma natural e amigável em português. A mensagem foi: {content}")
+            
+            if resposta:
+                send_message(f'💭 **{author}**, {resposta[:1900]}')
+                log(f'✅ Respondido via Gemini!')
+            else:
+                log('❌ Gemini não respondeu')
+    
     log('🏁 Ciclo completo!')
 
 if __name__ == '__main__':
