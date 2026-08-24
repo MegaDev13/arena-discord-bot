@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
 """
-Arena Discord Bot
+Arena Discord Bot - Mantém sandbox ativo e monitora Discord
 """
 import os, requests
 from datetime import datetime
 
 DISCORD_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 CHANNEL_ID = os.environ.get('DISCORD_CHANNEL_ID', '1387417968748793967')
+SANDBOX_URL = os.environ.get('SANDBOX_URL', 'https://arena-ai.dev')
 
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+
+def ping_sandbox():
+    """Ping no sandbox para manter ativo"""
+    try:
+        r = requests.get(SANDBOX_URL, timeout=5)
+        log(f'🏓 Sandbox pingado: {r.status_code}')
+        return True
+    except Exception as e:
+        log(f'⚠️ Sandbox offline ou erro: {e}')
+        return False
 
 def get_last_id():
     try:
@@ -39,10 +50,16 @@ def respond(author, content):
     return r.status_code == 200
 
 def main():
-    log('Arena Bot Started!')
+    log('🚀 Arena Bot Started!')
+    
+    # 1. Ping no sandbox
+    ping_sandbox()
+    
+    # 2. Processa mensagens do Discord
     last = get_last_id()
     msgs = fetch_messages()
     
+    count = 0
     for msg in reversed(msgs):
         if msg['author'].get('bot'):
             continue
@@ -53,14 +70,15 @@ def main():
         
         author = msg['author']['username']
         content = msg['content']
-        log(f'NOVO: {author}: {content[:40]}')
+        log(f'📩 {author}: {content[:40]}')
         
         if respond(author, content):
-            log(f'OK: Respondi para {author}')
+            log(f'✅ Respondi para {author}')
+            count += 1
         
         save_last_id(msg['id'])
     
-    log('Pronto!')
+    log(f'🏁 Ciclo completo! ({count} respostas)')
 
 if __name__ == '__main__':
     main()
