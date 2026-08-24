@@ -17,27 +17,28 @@ def log(msg):
 def ping_sandbox():
     try:
         r = requests.get(SANDBOX_URL, timeout=5)
-        log(f'🏓 Sandbox pingado: {r.status_code}')
-    except Exception as e:
-        log(f'⚠️ Sandbox: {e}')
+        log(f'🏓 Sandbox pingado')
+    except:
+        log('⚠️ Sandbox offline')
 
 def call_gemini(prompt):
     """Chama Gemini AI"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+    # Usa modelo correto
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key={GEMINI_KEY}"
     data = {
         "contents": [{"parts": [{"text": prompt}]}]
     }
-    log(f'🔮 Chamando Gemini...')
+    log('🔮 Chamando Gemini...')
     try:
         r = requests.post(url, json=data, timeout=30)
-        log(f'Gemini response: {r.status_code}')
         if r.status_code == 200:
             return r.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            log(f'Gemini erro: {r.text[:200]}')
+            log(f'Gemini erro: {r.status_code}')
+            return None
     except Exception as e:
         log(f'Gemini exception: {e}')
-    return None
+        return None
 
 def send_message(content):
     """Envia mensagem no Discord"""
@@ -45,7 +46,6 @@ def send_message(content):
     payload = {'content': content}
     r = requests.post(f'https://discord.com/api/v10/channels/{CHANNEL_ID}/messages', 
                       headers=headers_discord, json=payload, timeout=10)
-    log(f'Enviou msg: {r.status_code}')
     return r.status_code == 200
 
 def fetch_messages():
@@ -54,21 +54,19 @@ def fetch_messages():
                      headers=headers_discord, timeout=10)
     if r.status_code == 200:
         return r.json()
-    log(f'Erro fetch: {r.status_code}')
     return []
 
 def main():
     log('🚀 Arena + Gemini Bot Started!')
     
     ping_sandbox()
-    
     msgs = fetch_messages()
     
     for msg in msgs:
         author = msg['author']['username']
         content = msg.get('content', '')
         
-        # Responde a TODAS as mensagens de humanos (exceto bots)
+        # Responde a TODAS as mensagens de humanos
         if not msg['author'].get('bot', False) and content:
             log(f'📩 {author}: {content[:50]}')
             
