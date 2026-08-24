@@ -13,15 +13,17 @@ def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
 def call_gemini(prompt):
+    log(f"DEBUG: GEMINI_KEY = {GEMINI_KEY[:10]}..." if GEMINI_KEY else "DEBUG: GEMINI_KEY = None")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_KEY}"
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     try:
         r = requests.post(url, json=data, timeout=30)
+        log(f"Gemini response: {r.status_code}")
         if r.status_code == 200:
             return r.json()['candidates'][0]['content']['parts'][0]['text']
-        log(f'Gemini erro: {r.status_code}')
+        log(f"Gemini error: {r.text[:200]}")
     except Exception as e:
-        log(f'Gemini: {e}')
+        log(f"Gemini exception: {e}")
     return None
 
 def send_message(content):
@@ -38,6 +40,7 @@ def fetch_messages():
 
 def main():
     log('🚀 Arena + Gemini Bot!')
+    log(f"DEBUG: DISCORD_TOKEN = {DISCORD_TOKEN[:10] if DISCORD_TOKEN else 'None'}...")
     msgs = fetch_messages()
     
     for msg in msgs:
